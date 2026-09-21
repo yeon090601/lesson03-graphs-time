@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 
 
 # ============================================================
@@ -334,10 +335,125 @@ show_graph_explanation(
 
 st.divider()
 
-st.header("3. 다음 그래프")
+st.header("3. 날짜별 10위권 일관객 합계")
 
-st.info(
-    "앞으로 새로운 그래프를 추가할 영역입니다."
+
+# ------------------------------------------------------------
+# 날짜별 10위권 일관객 합계 계산
+# ------------------------------------------------------------
+
+daily_audience = (
+    df.groupby("날짜", as_index=False)["일관객"]
+    .sum()
+    .rename(
+        columns={
+            "일관객": "10위권 일관객 합계"
+        }
+    )
+)
+
+# 날짜순으로 정렬합니다.
+daily_audience = daily_audience.sort_values("날짜")
+
+
+# ------------------------------------------------------------
+# 합계가 가장 컸던 3일 찾기
+# ------------------------------------------------------------
+
+top3_days = (
+    daily_audience
+    .nlargest(3, "10위권 일관객 합계")
+    .sort_values("날짜")
+)
+
+
+# ------------------------------------------------------------
+# 영역 그래프 만들기
+# ------------------------------------------------------------
+
+fig_daily = go.Figure()
+
+fig_daily.add_trace(
+    go.Scatter(
+        x=daily_audience["날짜"],
+        y=daily_audience["10위권 일관객 합계"],
+        mode="lines",
+        name="10위권 일관객 합계",
+        fill="tozeroy",
+        line={
+            "color": "#4C78A8",
+            "width": 2,
+        },
+        fillcolor="rgba(76, 120, 168, 0.25)",
+        hovertemplate=(
+            "<b>%{x|%Y-%m-%d}</b><br>"
+            "10위권 일관객 합계: %{y:,}명"
+            "<extra></extra>"
+        ),
+    )
+)
+
+
+# ------------------------------------------------------------
+# 가장 컸던 3일을 그래프 위에 표시
+# ------------------------------------------------------------
+
+# 점과 날짜 라벨을 별도의 trace로 표시합니다.
+fig_daily.add_trace(
+    go.Scatter(
+        x=top3_days["날짜"],
+        y=top3_days["10위권 일관객 합계"],
+        mode="markers+text",
+        name="합계 TOP 3",
+        text=[
+            date.strftime("%Y-%m-%d")
+            for date in top3_days["날짜"]
+        ],
+        textposition="top center",
+        marker={
+            "color": "#E45756",
+            "size": 9,
+            "line": {
+                "color": "white",
+                "width": 1,
+            },
+        },
+        hovertemplate=(
+            "<b>%{x|%Y-%m-%d}</b><br>"
+            "10위권 일관객 합계: %{y:,}명"
+            "<extra></extra>"
+        ),
+    )
+)
+
+
+fig_daily.update_layout(
+    title="날짜별 10위권 일관객 합계",
+    xaxis_title="날짜",
+    yaxis_title="일관객 합계",
+    hovermode="x unified",
+    height=550,
+    margin={
+        "l": 20,
+        "r": 20,
+        "t": 70,
+        "b": 20,
+    },
+    legend={
+        "title": "구분",
+    },
+)
+
+
+st.plotly_chart(
+    fig_daily,
+    use_container_width=True,
+)
+
+
+show_graph_explanation(
+    "날짜별로 그날 박스오피스 10위권 영화들이 모은 관객수를 합쳐 보면 "
+    "영화관 전체의 관객 규모가 특히 컸던 시기를 확인할 수 있습니다."
 )
 
 
@@ -380,8 +496,6 @@ top10_stats = (
 # 가로 막대그래프
 # ------------------------------------------------------------
 
-# Plotly의 가로 막대그래프는 y축을 영화명으로 두고
-# x축을 관객수로 지정하면 만들 수 있습니다.
 fig_top10 = px.bar(
     top10_stats,
     x="일관객합계",
@@ -412,7 +526,7 @@ fig_top10.update_layout(
 )
 
 
-# 막대 위에 마우스를 올렸을 때
+# 막대에 마우스를 올리면
 # 관객수와 10위권 등장 일수를 함께 보여줍니다.
 fig_top10.update_traces(
     texttemplate="%{x:,}명",
