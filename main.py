@@ -352,7 +352,6 @@ daily_audience = (
     )
 )
 
-# 날짜순으로 정렬합니다.
 daily_audience = daily_audience.sort_values("날짜")
 
 
@@ -395,10 +394,9 @@ fig_daily.add_trace(
 
 
 # ------------------------------------------------------------
-# 가장 컸던 3일을 그래프 위에 표시
+# 가장 컸던 3일 표시
 # ------------------------------------------------------------
 
-# 점과 날짜 라벨을 별도의 trace로 표시합니다.
 fig_daily.add_trace(
     go.Scatter(
         x=top3_days["날짜"],
@@ -510,8 +508,6 @@ fig_top10 = px.bar(
 )
 
 
-# 관객수가 많은 영화가 위에 오도록
-# y축의 순서를 뒤집습니다.
 fig_top10.update_layout(
     yaxis={
         "categoryorder": "total ascending",
@@ -526,8 +522,6 @@ fig_top10.update_layout(
 )
 
 
-# 막대에 마우스를 올리면
-# 관객수와 10위권 등장 일수를 함께 보여줍니다.
 fig_top10.update_traces(
     texttemplate="%{x:,}명",
     textposition="outside",
@@ -551,6 +545,136 @@ st.plotly_chart(
 show_graph_explanation(
     "이 기간 동안 어떤 영화가 가장 많은 일관객을 모았는지와 "
     "그 영화가 박스오피스 10위권에 며칠 동안 등장했는지를 함께 비교할 수 있습니다."
+)
+
+
+# ============================================================
+# 그래프 구역 5
+# ============================================================
+
+st.divider()
+
+st.header("5. 월 × 요일별 10위권 일관객 합계")
+
+
+# ------------------------------------------------------------
+# 날짜에서 월과 요일 추출
+# ------------------------------------------------------------
+
+# 월은 숫자로 뽑아 나중에 1월부터 12월 순서로 정렬합니다.
+df["월"] = df["날짜"].dt.month
+
+
+# pandas의 weekday는
+# 월요일=0, 화요일=1, ..., 일요일=6입니다.
+df["요일번호"] = df["날짜"].dt.weekday
+
+
+# 한글 요일 이름을 붙입니다.
+weekday_names = [
+    "월요일",
+    "화요일",
+    "수요일",
+    "목요일",
+    "금요일",
+    "토요일",
+    "일요일",
+]
+
+df["요일"] = df["요일번호"].map(
+    dict(enumerate(weekday_names))
+)
+
+
+# ------------------------------------------------------------
+# 월 × 요일별 일관객 합계 계산
+# ------------------------------------------------------------
+
+heatmap_data = (
+    df.groupby(
+        ["월", "요일번호", "요일"],
+        as_index=False,
+    )["일관객"]
+    .sum()
+    .rename(
+        columns={
+            "일관객": "일관객 합계"
+        }
+    )
+)
+
+
+# ------------------------------------------------------------
+# 히트맵용 표 형태로 변환
+# ------------------------------------------------------------
+
+heatmap_pivot = heatmap_data.pivot(
+    index="월",
+    columns="요일번호",
+    values="일관객 합계",
+)
+
+
+# 데이터에 실제로 존재하지 않는 월×요일 조합도
+# 표에 나타날 수 있도록 1~12월과 월~일을 모두 만듭니다.
+heatmap_pivot = heatmap_pivot.reindex(
+    index=range(1, 13),
+    columns=range(7),
+)
+
+
+# 그래프에 표시할 한글 요일 이름으로 열 이름 변경
+heatmap_pivot.columns = weekday_names
+
+
+# ------------------------------------------------------------
+# Plotly 히트맵
+# ------------------------------------------------------------
+
+fig_heatmap = go.Figure(
+    data=go.Heatmap(
+        z=heatmap_pivot.values,
+        x=weekday_names,
+        y=[
+            f"{month}월"
+            for month in heatmap_pivot.index
+        ],
+        colorscale="YlOrRd",
+        colorbar={
+            "title": "일관객 합계",
+        },
+        hovertemplate=(
+            "<b>%{y} %{x}</b><br>"
+            "10위권 일관객 합계: %{z:,}명"
+            "<extra></extra>"
+        ),
+    )
+)
+
+
+fig_heatmap.update_layout(
+    title="월 × 요일별 10위권 일관객 합계",
+    xaxis_title="요일",
+    yaxis_title="월",
+    height=600,
+    margin={
+        "l": 20,
+        "r": 20,
+        "t": 70,
+        "b": 20,
+    },
+)
+
+
+st.plotly_chart(
+    fig_heatmap,
+    use_container_width=True,
+)
+
+
+show_graph_explanation(
+    "월과 요일을 조합해 보면 어느 시기의 어떤 요일에 "
+    "10위권 영화들의 일관객 합계가 컸는지 한눈에 비교할 수 있습니다."
 )
 
 
